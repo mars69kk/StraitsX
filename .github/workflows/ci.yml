@@ -18,10 +18,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install
-      - run: npm run build
       - run: npm run lint
-      - run: npm run format:check
-      - run: npm test
+      - run: npm run format
+      - run: npm run test
+      - run: npm run build
 
   e2e:
     runs-on: ubuntu-latest

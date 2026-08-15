@@ -18,6 +18,7 @@ export interface PolicyResult {
   remainingSpendCents: number;
 }
 
+/** Deterministic server-side payment policy. The LLM never controls this function. */
 export function evaluatePaymentPolicy(input: PolicyInput): PolicyResult {
   const remainingSpendCents = Math.max(0, TOTAL_SPEND_LIMIT_CENTS - input.cumulativeSpendCents);
 
@@ -29,16 +30,18 @@ export function evaluatePaymentPolicy(input: PolicyInput): PolicyResult {
     return { decision: 'DENY', reason: 'Payment card is not bound to this PaymentAgentID', remainingSpendCents };
   }
 
-  if (input.amountCents <= 0) {
-    return { decision: 'DENY', reason: 'Payment amount must be positive', remainingSpendCents };
+  if (input.amountCents <= 0 || !Number.isSafeInteger(input.amountCents)) {
+    return { decision: 'DENY', reason: 'Payment amount must be a positive integer number of cents', remainingSpendCents };
   }
 
+  if (input.cumulativeSpendCents < 0 || !Number.isSafeInteger(input.cumulativeSpendCents)) {
+    return { decision: 'DENY', reason: 'Cumulative spend is invalid', remainingSpendCents };
+  }
+
+  // S$12 is a hard demo ceiling. Human authorization can override the S$6
+  // autonomous threshold, but cannot silently increase the total policy.
   if (input.cumulativeSpendCents + input.amountCents > TOTAL_SPEND_LIMIT_CENTS) {
-    return {
-      decision: input.humanAuthorization ? 'ALLOW' : 'REQUIRE_HUMAN_AUTHORIZATION',
-      reason: 'Transaction would exceed the S$12 total spend policy',
-      remainingSpendCents,
-    };
+    return { decision: 'DENY', reason: 'Transaction exceeds the S$12 total spend limit', remainingSpendCents };
   }
 
   if (input.amountCents > TRANSACTION_LIMIT_CENTS && !input.humanAuthorization) {
